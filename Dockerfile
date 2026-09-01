@@ -1,4 +1,4 @@
-ARG PG_VERSION=17.4
+ARG PG_VERSION=17.11
 FROM ghcr.io/cloudnative-pg/postgresql:${PG_VERSION}
 
 ARG PG_MAJOR=17
