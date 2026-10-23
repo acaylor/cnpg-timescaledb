@@ -17,7 +17,7 @@ on:
       base-variant:
         description: CloudNativePG base image variant (<flavor>-<debian codename>)
         required: true
-        default: "system-bookworm"
+        default: "standard-trixie"
 
 permissions:
   contents: read
@@ -27,8 +27,9 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: acaylor/cnpg-timescaledb
   # Base variant for tag-triggered builds. TimescaleDB 2.27+ has no Debian
-  # bullseye packages, and CloudNativePG's bare <version> tags are bullseye.
-  DEFAULT_BASE_VARIANT: system-bookworm
+  # bullseye packages, CloudNativePG's bare <version> tags are bullseye, and
+  # its system images are deprecated in favour of standard + Barman Cloud plugin.
+  DEFAULT_BASE_VARIANT: standard-trixie
 
 jobs:
   publish:
@@ -58,7 +59,7 @@ jobs:
           ts_version="${BASH_REMATCH[3]}"
 
           if [[ ! "$base_variant" =~ ^[a-z]+-[a-z]+$ ]]; then
-            echo "::error::'${base_variant}' does not look like <flavor>-<debian codename>, e.g. system-bookworm"
+            echo "::error::'${base_variant}' does not look like <flavor>-<debian codename>, e.g. standard-trixie"
             exit 1
           fi
 

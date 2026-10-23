@@ -1,5 +1,5 @@
 ARG PG_VERSION=17.11
-ARG PG_BASE_VARIANT=system-bookworm
+ARG PG_BASE_VARIANT=standard-trixie
 FROM ghcr.io/cloudnative-pg/postgresql:${PG_VERSION}-${PG_BASE_VARIANT}
 
 ARG PG_VERSION

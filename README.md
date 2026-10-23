@@ -16,11 +16,15 @@ Tags use this format:
 <postgres-major>.<postgres-minor>-ts<timescaledb-major>.<timescaledb-minor>.<timescaledb-patch>
 ```
 
-Example: `17.11-ts2.31.0` installs exactly TimescaleDB `2.31.0` (extension and loader packages) on the CloudNativePG `17.11-system-bookworm` base image.
+Example: `17.11-ts2.31.0` installs exactly TimescaleDB `2.31.0` (extension and loader packages) on the CloudNativePG `17.11-standard-trixie` base image.
 
 The PostgreSQL version in the tag is the version shipped in the image. The build holds the base image's `postgresql-17` package and fails if the requested TimescaleDB packages need a different PostgreSQL minor, rather than letting apt upgrade it.
 
-The base image is `ghcr.io/cloudnative-pg/postgresql:<postgres-version>-<base-variant>`, with `system-bookworm` as the default variant. CloudNativePG's bare `<postgres-version>` tags are Debian bullseye, and TimescaleDB stopped publishing bullseye packages after `2.26.4`.
+The base image is `ghcr.io/cloudnative-pg/postgresql:<postgres-version>-<base-variant>`, with `standard-trixie` as the default variant. CloudNativePG's bare `<postgres-version>` tags are Debian bullseye, and TimescaleDB stopped publishing bullseye packages after `2.26.4`.
+
+`standard` images do not include the Barman Cloud binaries, so backups must use the [Barman Cloud plugin](https://github.com/cloudnative-pg/plugin-barman-cloud) rather than in-tree `barmanObjectStore` (including in `externalClusters`). CloudNativePG has deprecated the `system` images, which do include them.
+
+Moving an existing cluster from a bullseye or bookworm based image to trixie changes glibc (2.41) and ICU (76). Databases using the libc provider with `C`/`POSIX` collation and no explicit column collations are unaffected; for anything else, reindex text indexes after the switch.
 
 Images tagged `17.4-ts*` were built before this check existed: they are labelled 17.4 but contain PostgreSQL 17.10, because the TimescaleDB packages required `postgresql-17 (>= 17.9)` and apt upgraded the server during the build.
 
@@ -29,7 +33,7 @@ Images tagged `17.4-ts*` were built before this check existed: they are labelled
 ```bash
 docker build \
   --build-arg PG_VERSION=17.11 \
-  --build-arg PG_BASE_VARIANT=system-bookworm \
+  --build-arg PG_BASE_VARIANT=standard-trixie \
   --build-arg PG_MAJOR=17 \
   --build-arg TIMESCALEDB_VERSION=2.31.0 \
   -t ghcr.io/acaylor/cnpg-timescaledb:17.11-ts2.31.0 .
@@ -73,4 +77,4 @@ git tag 17.11-ts2.31.0
 git push origin 17.11-ts2.31.0
 ```
 
-Tag-triggered builds use the `system-bookworm` base variant. To build on another variant, such as `standard-trixie`, run the workflow manually and set `base-variant`.
+Tag-triggered builds use the `standard-trixie` base variant. To build on another variant, such as `standard-bookworm`, run the workflow manually and set `base-variant`.
