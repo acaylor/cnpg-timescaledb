@@ -7,13 +7,17 @@ on:
   workflow_dispatch:
     inputs:
       postgres-version:
-        description: PostgreSQL version
+        description: PostgreSQL version (major.minor)
         required: true
-        default: "17.4"
+        default: "17.11"
       timescaledb-version:
-        description: TimescaleDB version
+        description: TimescaleDB version (exact, major.minor.patch)
         required: true
-        default: "2.17"
+        default: "2.31.0"
+      base-variant:
+        description: CloudNativePG base image variant (<flavor>-<debian codename>)
+        required: true
+        default: "system-bookworm"
 
 permissions:
   contents: read
@@ -22,6 +26,9 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: acaylor/cnpg-timescaledb
+  # Base variant for tag-triggered builds. TimescaleDB 2.27+ has no Debian
+  # bullseye packages, and CloudNativePG's bare <version> tags are bullseye.
+  DEFAULT_BASE_VARIANT: system-bookworm
 
 jobs:
   publish:
@@ -35,18 +42,33 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            pg_version="${{ inputs.postgres-version }}"
-            ts_version="${{ inputs.timescaledb-version }}"
+            image_tag="${{ inputs.postgres-version }}-ts${{ inputs.timescaledb-version }}"
+            base_variant="${{ inputs.base-variant }}"
           else
-            tag="${GITHUB_REF_NAME}"
-            pg_version="${tag%%-ts*}"
-            ts_version="${tag#*-ts}"
+            image_tag="${GITHUB_REF_NAME}"
+            base_variant="${DEFAULT_BASE_VARIANT}"
           fi
 
-          echo "pg_version=${pg_version}" >> "$GITHUB_OUTPUT"
-          echo "pg_major=${pg_version%%.*}" >> "$GITHUB_OUTPUT"
-          echo "ts_version=${ts_version}" >> "$GITHUB_OUTPUT"
-          echo "image_tag=${pg_version}-ts${ts_version}" >> "$GITHUB_OUTPUT"
+          if [[ ! "$image_tag" =~ ^(([0-9]+)\.[0-9]+)-ts([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::'${image_tag}' does not match <pg major>.<pg minor>-ts<ts major>.<ts minor>.<ts patch>, e.g. 17.11-ts2.31.0"
+            exit 1
+          fi
+          pg_version="${BASH_REMATCH[1]}"
+          pg_major="${BASH_REMATCH[2]}"
+          ts_version="${BASH_REMATCH[3]}"
+
+          if [[ ! "$base_variant" =~ ^[a-z]+-[a-z]+$ ]]; then
+            echo "::error::'${base_variant}' does not look like <flavor>-<debian codename>, e.g. system-bookworm"
+            exit 1
+          fi
+
+          {
+            echo "pg_version=${pg_version}"
+            echo "pg_major=${pg_major}"
+            echo "ts_version=${ts_version}"
+            echo "base_variant=${base_variant}"
+            echo "image_tag=${image_tag}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -65,6 +87,7 @@ jobs:
           push: true
           build-args: |
             PG_VERSION=${{ steps.versions.outputs.pg_version }}
+            PG_BASE_VARIANT=${{ steps.versions.outputs.base_variant }}
             PG_MAJOR=${{ steps.versions.outputs.pg_major }}
             TIMESCALEDB_VERSION=${{ steps.versions.outputs.ts_version }}
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.versions.outputs.image_tag }}
